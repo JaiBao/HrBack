@@ -1,5 +1,5 @@
 import users from '../models/users.js'
-import vacations from '../models/vacations.js'
+import vacations from '../models/userPunchrecords.js'
 import jwt from 'jsonwebtoken'
 
 export const register = async (req, res) => {
@@ -7,7 +7,14 @@ export const register = async (req, res) => {
     await users.create({
       name: req.body.name,
       number: req.body.number,
-      password: req.body.password
+      password: req.body.password,
+      image: req.body?.image || '',
+      team: req.body.team,
+      role: req.body?.role || 0,
+      year: req.body.year,
+      month: req.body.month,
+      day: req.body.day,
+      timerecord: []
     })
     res.status(200).json({ success: true, message: '' })
   } catch (error) {
@@ -23,7 +30,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
+    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7days' })
     req.user.tokens.push(token)
     await req.user.save()
     res.status(200).json({
@@ -33,10 +40,13 @@ export const login = async (req, res) => {
         _id: req.user._id,
         token,
         name: req.user.name,
-        // account: req.user.account,
-        phone: req.user.phone,
-        // cart: req.user.cart.reduce((total, current) => total + current.quantity, 0),
-        role: req.user.role
+        number: req.user.number,
+        role: req.user.role,
+        team: req.user.team,
+        year: req.user.year,
+        month: req.user.month,
+        day: req.user.day,
+        image: req.user.image
       }
     })
   } catch (error) {
@@ -47,7 +57,8 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    req.user.tokens = req.user.tokens.filter(token => token !== req.token)
+    req.user.tokens = []
+
     await req.user.save()
     res.status(200).json({ success: true, message: '' })
   } catch (error) {
@@ -74,25 +85,42 @@ export const getUser = (req, res) => {
       message: '',
       result: {
         name: req.user.name,
-        // account: req.user.account,
-        phone: req.user.phone,
-        role: req.user.role
+        number: req.user.number,
+        role: req.user.role,
+        team: req.user.team
       }
     })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 }
+export const getUserAdmin = async (req, res) => {
+  try {
+    const result = await users.findOne({ number: req.params.number })
+    res.status(200).json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+export const getTeam = async (req, res) => {
+  const teamEnumValues = users.schema.path('team').enumValues
+  res.json(teamEnumValues)
+}
+
 export const editUser = async (req, res) => {
   try {
     const data = {
-      // account: req.body.account,
-      phone: req.body.phone,
+      number: req.body.number,
       name: req.body.name,
-      password: req.body.password
+      team: req.body.team
+    }
+    if (req.body.password) {
+      data.password = req.body.password
     }
     const id = req.user._id
-    console.log(req.body)
     const result = await users.findByIdAndUpdate(id, data, { new: true })
     res.status(200).send({ success: true, message: result })
   } catch (error) {
@@ -108,14 +136,17 @@ export const editUser = async (req, res) => {
 export const editUserAdmin = async (req, res) => {
   try {
     const data = {
-      // account: req.body.account,
-      phone: req.body.phone,
+      number: req.body.number,
       name: req.body.name,
-      id: req.body.id,
       role: req.body.role,
-      password: req.body.password
+      team: req.body.team,
+      depart: req.body.depart
     }
-    const result = await users.findByIdAndUpdate({ _id: req.body.id }, data, { new: true })
+    // 如果 req.body.password 不為空，则添加到 data
+    if (req.body.password) {
+      data.password = req.body.password
+    }
+    const result = await users.findByIdAndUpdate({ _id: req.body._id }, data, { new: true })
     res.status(200).send({ success: true, message: result })
   } catch (error) {
     if (error.name === 'ValidationError') {
@@ -174,15 +205,15 @@ export const findAllUserVacation = async (req, res) => {
 //   }
 // }
 
-export const findVacationsByDate = async (req, res) => {
-  try {
-    const date = req.body.date
-    const vacationss = await users.find({ startDate: { $lte: date }, endDate: { $gte: date } })
-    res.status(200).json({ success: true, message: vacationss })
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message })
-  }
-}
+// export const findVacationsByDate = async (req, res) => {
+//   try {
+//     const date = req.body.date
+//     const vacationss = await vacations.find({ date: { $lte: date }, endDate: { $gte: date } })
+//     res.status(200).json({ success: true, message: vacationss })
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message })
+//   }
+// }
 
 export const getAllUser = async (req, res) => {
   try {
@@ -204,7 +235,7 @@ export const deleteUser = async (req, res) => {
 
 export const findUserVacation = async (req, res) => {
   try {
-    const result = await vacations.find({ name: req.params.name })
+    const result = await vacations.find({ number: req.params.number })
     res.status(200).json({ success: true, message: result })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
